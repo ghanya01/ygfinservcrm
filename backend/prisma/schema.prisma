@@ -1,0 +1,318 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  AGENT
+  VIEWER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum DealStage {
+  PROSPECTING
+  QUALIFICATION
+  PROPOSAL
+  NEGOTIATION
+  CLOSING
+  WON
+  LOST
+}
+
+enum ClientType {
+  INDIVIDUAL
+  CORPORATE
+  TRUST
+  PARTNERSHIP
+}
+
+enum InvestmentType {
+  MUTUAL_FUNDS
+  STOCKS
+  BONDS
+  INSURANCE
+  FIXED_DEPOSITS
+  REAL_ESTATE
+  COMMODITIES
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  TASK
+  NOTE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  firstName String
+  lastName  String
+  password  String
+  role      UserRole @default(AGENT)
+  phone     String?
+  avatar    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  leads         Lead[]
+  deals         Deal[]
+  activities    Activity[]
+  clients       Client[]
+  assignedLeads Lead[]   @relation("AssignedLeads")
+  assignedDeals Deal[]   @relation("AssignedDeals")
+
+  @@map("users")
+}
+
+model Client {
+  id          String     @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String     @unique
+  phone       String
+  alternatePhone String?
+  dateOfBirth DateTime?
+  clientType  ClientType @default(INDIVIDUAL)
+  
+  // Address
+  address     String?
+  city        String?
+  state       String?
+  pincode     String?
+  country     String?    @default("India")
+  
+  // Professional Info
+  occupation  String?
+  company     String?
+  annualIncome Decimal?
+  
+  // Financial Info
+  panNumber   String?    @unique
+  aadharNumber String?   @unique
+  bankAccount String?
+  ifscCode    String?
+  
+  // CRM Fields
+  source      String?
+  tags        String[]
+  notes       String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  // Relations
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  leads       Lead[]
+  deals       Deal[]
+  activities  Activity[]
+  investments Investment[]
+  documents   Document[]
+
+  @@map("clients")
+}
+
+model Lead {
+  id          String     @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String
+  phone       String
+  company     String?
+  jobTitle    String?
+  status      LeadStatus @default(NEW)
+  source      String?
+  value       Decimal?
+  probability Int?       @default(0)
+  expectedCloseDate DateTime?
+  
+  // Address
+  address     String?
+  city        String?
+  state       String?
+  country     String?    @default("India")
+  
+  notes       String?
+  tags        String[]
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  // Relations
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  assignedToId String?
+  assignedTo  User?      @relation("AssignedLeads", fields: [assignedToId], references: [id])
+  clientId    String?
+  client      Client?    @relation(fields: [clientId], references: [id])
+  activities  Activity[]
+  deals       Deal[]
+
+  @@map("leads")
+}
+
+model Deal {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  stage       DealStage @default(PROSPECTING)
+  value       Decimal
+  probability Int       @default(0)
+  expectedCloseDate DateTime?
+  actualCloseDate   DateTime?
+  
+  // Financial Services Specific
+  investmentType InvestmentType?
+  products       String[]
+  commission     Decimal?
+  
+  notes       String?
+  tags        String[]
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  assignedToId String?
+  assignedTo  User?     @relation("AssignedDeals", fields: [assignedToId], references: [id])
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id])
+  leadId      String?
+  lead        Lead?     @relation(fields: [leadId], references: [id])
+  activities  Activity[]
+  investments Investment[]
+
+  @@map("deals")
+}
+
+model Activity {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  type        ActivityType
+  priority    Priority     @default(MEDIUM)
+  dueDate     DateTime?
+  completedAt DateTime?
+  isCompleted Boolean      @default(false)
+  
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  // Relations
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+  clientId    String?
+  client      Client?      @relation(fields: [clientId], references: [id])
+  leadId      String?
+  lead        Lead?        @relation(fields: [leadId], references: [id])
+  dealId      String?
+  deal        Deal?        @relation(fields: [dealId], references: [id])
+
+  @@map("activities")
+}
+
+model Investment {
+  id             String         @id @default(cuid())
+  investmentType InvestmentType
+  productName    String
+  investmentAmount Decimal
+  currentValue   Decimal?
+  purchaseDate   DateTime
+  maturityDate   DateTime?
+  interestRate   Decimal?
+  returns        Decimal?
+  
+  // Documents
+  folioNumber    String?
+  certificateNumber String?
+  
+  notes          String?
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  
+  // Relations
+  clientId       String
+  client         Client         @relation(fields: [clientId], references: [id])
+  dealId         String?
+  deal           Deal?          @relation(fields: [dealId], references: [id])
+
+  @@map("investments")
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  fileName    String
+  originalName String
+  mimeType    String
+  size        Int
+  path        String
+  description String?
+  tags        String[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+
+  @@map("documents")
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  address     String
+  city        String
+  state       String
+  country     String   @default("India")
+  pincode     String
+  phone       String
+  email       String
+  website     String?
+  logo        String?
+  
+  // Financial Services License Info
+  licenseNumber String?
+  licenseType   String?
+  regulatoryBody String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("company")
+}
